@@ -1,3 +1,18 @@
+# README - Update
+
+Ég er búinn að gera þetta aðeins meira sexy. Nú nota ég 'activeapp.py' og keyri svona:
+
+```bash
+shiny run --reload active/activeapp.py
+```
+
+og passa að `CSV` sé til staðar þegar þú keyrir.
+
+annars keyra eins og fyrir neðan.
+
+ATH ég er ekki lengur að nota SQL gagnagrunn, það var of flókið. Ég les `.csv` skrárnar beint inn í python.
+
+
 # README - BETA mælaborð fyrir Sigurð Erni með SHINY
 
 ## Keyrsla
