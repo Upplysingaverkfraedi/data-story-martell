@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import plotly.express as px
+import re
 from shiny import App, reactive, render, ui
 from shinywidgets import output_widget, render_plotly
 
@@ -27,6 +28,26 @@ def get_filtered_data_for_ids(hlaup_data, ids_str):
     # Sort data by 'hlaup_id' in ascending order
     filtered_data = filtered_data.sort_values('hlaup_id')
     return filtered_data
+
+# Function to convert time string to seconds
+def time_to_seconds(time_str):
+    try:
+        return pd.to_timedelta(time_str).total_seconds()
+    except:
+        try:
+            return pd.to_timedelta('00:' + time_str).total_seconds()
+        except:
+            return None
+
+# Function to format seconds into 'HH:MM:SS' format
+def format_seconds_to_hhmmss(seconds):
+    if pd.isnull(seconds):
+        return None
+    seconds = int(seconds)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    return f"{hours}:{minutes:02d}:{secs:02d}"
 
 # UI - Notendaviðmót
 app_ui = ui.page_fluid(
@@ -84,6 +105,29 @@ app_ui = ui.page_fluid(
             )
         ),
         ui.nav_panel(
+            "Hraði",
+            ui.layout_sidebar(
+                ui.sidebar(
+                    ui.h3("Veldu vegalengd"),
+                    ui.input_radio_buttons(
+                        "distance_range",
+                        "Veldu bil:",
+                        choices={
+                            "1": "1KM - 9.9KM",
+                            "2": "10KM - 19.9KM",
+                            "3": "20KM - 39.9KM",
+                            "4": "40KM - 100KM",
+                            "5": "Allar vegalengdir"
+                        },
+                        selected="1"
+                    )
+                ),
+                ui.div(
+                    output_widget("speed_line_chart")
+                )
+            )
+        ),
+        ui.nav_panel(
             "Gögn",
             ui.h2("Gögn um hlaup"),
             ui.input_select("table_select", "Veldu töflu:", choices=['hlaup_data', 'summary_data', 'ar_data']),
@@ -123,8 +167,84 @@ def server(input, output, session):
     # Sameina hlaup_data og ar_data til að fá 'ar' fyrir hvert 'hlaup_id'
     hlaup_data = hlaup_data.merge(ar_data[['hlaup_id', 'ar']], on='hlaup_id', how='left')
 
-    # Fall til að formatta sekúndur í hh:mm:ss
+    # --- Nýr kóði til að nota lengdartöfluna ---
+
+    # Búa til streng með töflunni
+    length_table_str = """
+Length	Count	IDs
+10KM	8	1002, 1145, 1170, 1223, 1229, 1260, 74, 808
+12KM	1	175
+14KM	1	1214
+17.5KM	3	1072, 1219, 566
+17.6KM	1	196
+19KM	1	711
+21KM	4	1076, 66, 69, 96
+22KM	0	1003
+23KM	1	828
+24KM	2	1005, 554
+27KM	1	1167
+28KM	1	748
+30.6KM	1	557
+32.7KM	2	738, 924
+32KM	1	13
+37KM	1	36
+42KM	6	222, 227, 655, 837, 963, 974
+50KM	3	210, 61, 679
+53KM	1	237
+55KM	1	487
+5KM	4	1110, 1156, 185, 261
+63KM	1	3
+8.3KM	1	573
+Backyard	3	317, 360, 469
+Puffin	4	110, 375, 585, 617
+Unknown	4	127, 437, 525, 548
+"""
+
+    # Lesa strenginn inn í DataFrame
+    from io import StringIO
+    length_df = pd.read_csv(StringIO(length_table_str), sep='\t')
+
+    # Útvíkka 'IDs' dálkinn til að fá einn 'hlaup_id' á hverja línu
+    length_df_expanded = length_df.drop('Count', axis=1).copy()
+    length_df_expanded = length_df_expanded.assign(
+        hlaup_id=length_df_expanded['IDs'].str.split(', ')
+    ).explode('hlaup_id')
+    length_df_expanded = length_df_expanded.drop('IDs', axis=1)
+    length_df_expanded['hlaup_id'] = length_df_expanded['hlaup_id'].astype(int)
+
+    # Búa til 'Distance_m' dálk úr 'Length'
+    def length_to_meters(length_str):
+        try:
+            match = re.search(r'(\d+(?:\.\d+)?)', length_str)
+            if match:
+                distance_km = float(match.group(1))
+                distance_m = distance_km * 1000
+                return distance_m
+            else:
+                return None
+        except:
+            return None
+
+    length_df_expanded['Distance_m'] = length_df_expanded['Length'].apply(length_to_meters)
+
+    # Sameina við hlaup_data á 'hlaup_id'
+    hlaup_data = hlaup_data.merge(length_df_expanded[['hlaup_id', 'Distance_m']], on='hlaup_id', how='left')
+
+    # --- Lok nýs kóða ---
+
+    # Umbreyta 'Time' í sekúndur
+    hlaup_data['Time_in_seconds'] = hlaup_data['Time'].apply(time_to_seconds)
+
+    # Reikna hraða (m/s)
+    hlaup_data['Speed_m_s'] = hlaup_data.apply(
+        lambda row: row['Distance_m'] / row['Time_in_seconds'] if pd.notnull(row['Distance_m']) and pd.notnull(row['Time_in_seconds']) and row['Time_in_seconds'] > 0 else None,
+        axis=1
+    )
+
+    # Fall til að formatta sekúndur í 'HH:MM:SS' snið
     def format_seconds(total_seconds):
+        if pd.isnull(total_seconds):
+            return None
         total_seconds = int(total_seconds)
         hours, remainder = divmod(total_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -171,13 +291,7 @@ def server(input, output, session):
         # Athuga hvort 'Time' gögn séu til staðar
         if 'Time' in data.columns and not data['Time'].isnull().all():
             # Umbreyta 'Time' í sekúndur
-            if data['Time'].dtype == 'object':
-                try:
-                    data['Time_in_seconds'] = pd.to_timedelta(data['Time']).dt.total_seconds()
-                except:
-                    data['Time_in_seconds'] = pd.to_timedelta('00:' + data['Time']).dt.total_seconds()
-            else:
-                data['Time_in_seconds'] = data['Time'].astype(float)
+            data['Time_in_seconds'] = data['Time'].apply(time_to_seconds)
 
             # Umbreyta 'ar' og 'hlaup_id' í Int64 til að leyfa NaN gildi
             data['ar'] = data['ar'].astype('Int64')
@@ -185,19 +299,34 @@ def server(input, output, session):
             data = data.dropna(subset=['hlaup_id', 'Time_in_seconds'])
             data = data.sort_values('hlaup_id')
 
+            # Bæta við dálki með tíma í 'HH:MM:SS' sniði
+            data['Time_formatted'] = data['Time_in_seconds'].apply(format_seconds_to_hhmmss)
+
             # Línurit með 'hlaup_id' á x-ásnum og 'Time_in_seconds' á y-ásnum
             fig = px.line(
                 data,
                 x='hlaup_id',
                 y='Time_in_seconds',
                 title=f"Framvinda: Tími fyrir {input.length_select()}",
-                labels={'hlaup_id': 'Hlaup ID', 'Time_in_seconds': 'Tími (sekúndur)'}
+                labels={'hlaup_id': 'Hlaup ID', 'Time_in_seconds': 'Tími (HH:MM:SS)'}
             )
             fig.update_traces(mode='lines+markers')
 
-            # Bæta við formattaðri tímalengd í sveima upplýsingum
-            hover_text = data['Time_in_seconds'].apply(format_seconds)
-            fig.update_traces(hovertemplate='Hlaup ID: %{x}<br>Tími: %{text}', text=hover_text)
+            # Bæta við formattaðri tímalengd í sveimaupplýsingum
+            fig.update_traces(
+                hovertemplate='Hlaup ID: %{x}<br>Tími: %{text}',
+                text=data['Time_formatted']
+            )
+
+            # Sérsníða y-ásinn til að sýna tímann í 'HH:MM:SS' sniði
+            y_ticks = sorted(data['Time_in_seconds'].unique())
+            y_ticktext = [format_seconds_to_hhmmss(t) for t in y_ticks]
+
+            fig.update_yaxes(
+                tickmode='array',
+                tickvals=y_ticks,
+                ticktext=y_ticktext
+            )
 
             # Snúa x-ásnum til að hafa hlaup_id í lækkandi röð
             fig.update_layout(xaxis=dict(autorange='reversed'))
@@ -207,7 +336,7 @@ def server(input, output, session):
             # Reyna að finna 'Laps' dálkinn
             laps_col = None
             for col in data.columns:
-                if col.lower() == 'Laps':
+                if col.lower() == 'laps':
                     laps_col = col
                     break
             if laps_col and not data[laps_col].isnull().all():
@@ -243,13 +372,7 @@ def server(input, output, session):
 
         if 'Time' in data.columns and not data['Time'].isnull().all():
             # Umbreyta 'Time' í sekúndur
-            if data['Time'].dtype == 'object':
-                try:
-                    data['Time_in_seconds'] = pd.to_timedelta(data['Time']).dt.total_seconds()
-                except:
-                    data['Time_in_seconds'] = pd.to_timedelta('00:' + data['Time']).dt.total_seconds()
-            else:
-                data['Time_in_seconds'] = data['Time'].astype(float)
+            data['Time_in_seconds'] = data['Time'].apply(time_to_seconds)
 
             # Umbreyta 'ar' og 'hlaup_id' í Int64 til að leyfa NaN gildi
             data['ar'] = data['ar'].astype('Int64')
@@ -264,7 +387,7 @@ def server(input, output, session):
             # Reyna að finna 'Laps' dálkinn
             laps_col = None
             for col in data.columns:
-                if col.lower() == 'Laps':
+                if col.lower() == 'laps':
                     laps_col = col
                     break
             if laps_col and not data[laps_col].isnull().all():
@@ -310,6 +433,79 @@ def server(input, output, session):
             return ar_data
         else:
             return pd.DataFrame()
+
+    # Reactive filter fyrir vegalengd fyrir 'Hraði' flipann
+    @reactive.Calc
+    def speed_filtered_data():
+        distance_range = input.distance_range()
+        if distance_range == "1":
+            min_dist, max_dist = 1 * 1000, 9.9 * 1000
+        elif distance_range == "2":
+            min_dist, max_dist = 10 * 1000, 19.9 * 1000
+        elif distance_range == "3":
+            min_dist, max_dist = 20 * 1000, 39.9 * 1000
+        elif distance_range == "4":
+            min_dist, max_dist = 40 * 1000, 100 * 1000
+        elif distance_range == "5":
+            min_dist, max_dist = None, None  # Engin síun
+        else:
+            min_dist, max_dist = 0, float('inf')
+
+        data = hlaup_data.dropna(subset=['Distance_m', 'Time_in_seconds', 'Speed_m_s'])
+
+        if min_dist is not None and max_dist is not None:
+            data = data[(data['Distance_m'] >= min_dist) & (data['Distance_m'] <= max_dist)]
+        # Ef min_dist og max_dist eru None, síum við ekki eftir vegalengd
+
+        data = data.sort_values('hlaup_id')
+        return data
+
+    # Línurit fyrir hraða í 'Hraði' flipanum
+    @output
+    @render_plotly
+    def speed_line_chart():
+        data = speed_filtered_data()
+        if data.empty:
+            return px.scatter(title="Engin gögn til að sýna.")
+        
+        # Bæta við formattaðri vegalengd og tíma
+        data['Distance_km'] = data['Distance_m'] / 1000
+        data['Time_formatted'] = data['Time_in_seconds'].apply(format_seconds_to_hhmmss)
+        
+        distance_range = input.distance_range()
+
+        if distance_range == "5":
+            # Fyrir allar vegalengdir, búa til punktarit með hallalínu
+            fig = px.scatter(
+                data,
+                x='hlaup_id',
+                y='Speed_m_s',
+                trendline='ols',
+                title="Hraði (m/s) fyrir öll hlaup",
+                labels={'hlaup_id': 'Hlaup ID', 'Speed_m_s': 'Hraði (m/s)'},
+                hover_data={'Name': True, 'Distance_km': True, 'Time_formatted': True},
+            )
+            fig.update_traces(
+                hovertemplate='Hlaup ID: %{x}<br>Nafn: %{customdata[0]}<br>Vegalengd: %{customdata[1]:.2f} km<br>Tími: %{customdata[2]}<br>Hraði: %{y:.2f} m/s'
+            )
+        else:
+            # Fyrir ákveðin vegalengdarbil, halda áfram með línurit
+            fig = px.line(
+                data,
+                x='hlaup_id',
+                y='Speed_m_s',
+                title="Hraði (m/s) eftir hlaup ID",
+                labels={'hlaup_id': 'Hlaup ID', 'Speed_m_s': 'Hraði (m/s)'},
+                hover_data={'Name': True, 'Distance_km': True, 'Time_formatted': True},
+                markers=True
+            )
+            fig.update_traces(
+                hovertemplate='Hlaup ID: %{x}<br>Nafn: %{customdata[0]}<br>Vegalengd: %{customdata[1]:.2f} km<br>Tími: %{customdata[2]}<br>Hraði: %{y:.2f} m/s'
+            )
+
+        # Snúa x-ásnum til að hafa hlaup_id í lækkandi röð
+        fig.update_layout(xaxis=dict(autorange='reversed'))
+        return fig
 
 # Keyra Shiny appið
 app = App(app_ui, server)
