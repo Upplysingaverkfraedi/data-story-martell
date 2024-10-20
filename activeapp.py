@@ -57,6 +57,16 @@ def server(input, output, session):
         return fig
 
     # Línurit sem uppfærist þegar notandi velur lengd
+    def format_seconds_to_hhmmss(seconds):
+        # Breyta sekúndum í heiltölur
+        seconds = int(seconds)
+        # Reikna út klukkustundir, mínútur og sekúndur
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+        # Skila streng í 'HH:MM:SS' sniði
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
     @output
     @render_plotly
     @reactive.event(input.length_select)
@@ -68,19 +78,67 @@ def server(input, output, session):
         ids_str = summary_data[summary_data['Length'] == selected_length]["IDs"].values[0]
         filtered_data = get_filtered_data_for_ids(hlaup_data, ids_str)
         
-        # Nota 'Time' ef hann er til staðar, annars 'Laps' (fyrir backyard hlaup)
+        # Athuga hvort 'Time' dálkurinn sé til staðar og ekki tómur
         if 'Time' in filtered_data.columns and not filtered_data['Time'].isnull().all():
-            y_axis = 'Time'
+            # Breyta 'Time' úr streng í sekúndur
+            if filtered_data['Time'].dtype == 'object':
+                try:
+                    # Reyna að umbreyta 'Time' í sekúndur með 'HH:MM:SS' sniði
+                    filtered_data['Time_in_seconds'] = pd.to_timedelta(filtered_data['Time']).dt.total_seconds()
+                except:
+                    # Ef það virkar ekki, reyna með 'MM:SS' sniði
+                    filtered_data['Time_in_seconds'] = pd.to_timedelta('00:' + filtered_data['Time']).dt.total_seconds()
+            else:
+                # Ef 'Time' er þegar tölulegt gildi í sekúndum
+                filtered_data['Time_in_seconds'] = filtered_data['Time']
+            
+            y_axis = 'Time_in_seconds'
+            y_label = 'Tími (HH:MM:SS)'
+            
+            # Búa til línurit með 'hlaup_id' á x-ás og 'Time_in_seconds' á y-ás
+            fig = px.line(
+                filtered_data,
+                x='hlaup_id',
+                y=y_axis,
+                title=f"Tími fyrir {selected_length}",
+                labels={'hlaup_id': 'Hlaup ID', y_axis: y_label}
+            )
+            
+            # Búa til sérsniðna y-ás merkimiða án '0 days'
+            y_ticks = sorted(filtered_data[y_axis].unique())
+            y_ticktext = [format_seconds_to_hhmmss(seconds) for seconds in y_ticks]
+            
+            fig.update_yaxes(
+                tickmode='array',
+                tickvals=y_ticks,
+                ticktext=y_ticktext
+            )
+            
+            # Uppfæra hovertemplate til að sýna tímann í 'HH:MM:SS' sniði
+            hover_text = [format_seconds_to_hhmmss(t) for t in filtered_data[y_axis]]
+            fig.update_traces(
+                hovertemplate='Hlaup ID: %{x}<br>Tími: %{text}',
+                text=hover_text
+            )
+            
         else:
             y_axis = 'Laps'
-
-        # Búa til línurit fyrir valda vegalengd (tími eða hringir vs hlaupa_id)
-        fig = px.line(filtered_data, x='hlaup_id', y=y_axis, title=f"{y_axis} fyrir {selected_length}")
+            y_label = 'Fjöldi hringja'
+            
+            # Búa til línurit fyrir 'Laps'
+            fig = px.line(
+                filtered_data,
+                x='hlaup_id',
+                y=y_axis,
+                title=f"Hringir fyrir {selected_length}",
+                labels={'hlaup_id': 'Hlaup ID', y_axis: y_label}
+            )
         
-        # Virkja hover event á línuritið til að sýna samsvarandi gildi í töflunni
-        fig.update_traces(hoverinfo='x+y', mode='lines+markers')
+        # Virkja hover og sýna punktana
+        fig.update_traces(mode='lines+markers')
         return fig
 
+ 
     # Tafla sem sýnir tímatölur (Time) fyrir valin hlaupa_id
     @output
     @render.table
@@ -88,7 +146,22 @@ def server(input, output, session):
         selected_length = input.length_select()
         ids_str = summary_data[summary_data['Length'] == selected_length]["IDs"].values[0]
         filtered_data = get_filtered_data_for_ids(hlaup_data, ids_str)
-        return filtered_data[['hlaup_id', 'Time']].dropna()
+        
+        if 'Time' in filtered_data.columns and not filtered_data['Time'].isnull().all():
+            # Breyta 'Time' í 'HH:MM:SS' snið ef það er ekki nú þegar þannig
+            if filtered_data['Time'].dtype == 'object':
+                try:
+                    filtered_data['Time_delta'] = pd.to_timedelta(filtered_data['Time'])
+                except:
+                    filtered_data['Time_delta'] = pd.to_timedelta('00:' + filtered_data['Time'])
+            else:
+                filtered_data['Time_delta'] = pd.to_timedelta(filtered_data['Time'], unit='s')
+            
+            # Sýna 'hlaup_id' og 'Time_delta' í töflunni
+            filtered_data['Time_formatted'] = filtered_data['Time_delta'].astype(str)
+            return filtered_data[['hlaup_id', 'Time_formatted']]
+        else:
+            return filtered_data[['hlaup_id', 'Laps']].dropna()
 
 # Keyra Shiny appið
 app = App(app_ui, server)
