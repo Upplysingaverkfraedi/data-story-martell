@@ -1,0 +1,137 @@
+---
+title: "Tímataka - Sigurjón Ernir Sturlusson"
+author: "Brynjar Ari Magnússon, Gunnar Sigurjón Árnason, Halldór Óli Gunnarsson, Jakob Stefán Ívarsson"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: cerulean
+    highlight: tango
+    code_folding: hide
+    number_sections: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(knitr)
+library(kableExtra)
+```
+
+# Inngangur
+Þetta verkefni felur í sér þróun á mælaborði sem byggir á gögnum um þátttöku og frammistöðu hlauparans Sigurjóns Ernis Sturlusonar í ýmsum keppnum á vefsíðunni tímataka.net. Markmið verkefnisins er að safna, vinna úr og greina gögnin til að veita innsýn í þróun frammistöðu hans yfir tíma og hvernig ýmsir þættir hafa áhrif á árangur hans.
+
+Gögnin voru fengin frá opinberum tímamælingum á tímataka.net og voru unnin með notkun Python og SQL gagnagrunna. Niðurstöðurnar voru svo settar fram í sjónrænu formi með Shiny mælaborði, sem gefur notendum möguleika á að skoða frammistöðu Sigurjóns í gegnum fjölbreyttar greiningar og samanburði á keppnum.
+
+Skýrslan mun fjalla um ferlið við gagnaöflun og gagnavinnslu, leggja fram helstu niðurstöður greiningarinnar og útskýra tilgang mælaborðsins. Við munum einnig svara rannsóknarspurningum sem tengjast þróun og framförum í árangri hlauparans og hvernig niðurstöðurnar geta nýst til að bæta frammistöðu hans í framtíðinni.
+
+Markmið skýrslunnar er því að sýna fram á hvernig notkun gagna og greiningar geta veitt dýpri innsýn í árangur einstaklings með því að vinna úr þeim ýmiskonar mæliborð.
+
+
+# Lýsing á gagnaöflun    
+Gögnin fyrir þetta verkefni voru sótt af opinberu gagnasafni á vefsíðunni tímataka.net, sem heldur utan um upplýsingar um keppnir og niðurstöður hlaupara í ýmsum vegalengdum. Í þessu verkefni var sérstök áhersla lögð á að safna gögnum um tiltekinn hlaupara, Sigurjón Erni Sturluson, þar sem niðurstöður hans úr öllum hlaupaþátttökum sem skráðar voru á síðuna, voru notaðar til frekari greiningar.
+
+Við gagnaöflunina var notast við Python-kóða til að sækja gögnin á kerfisbundinn hátt. Python-kóðinn greindi allar keppnir sem hlauparinn hafði tekið þátt í og dró sérstaklega fram upplýsingar um sæti hans og tíma í keppnunum. Gögnin voru sett fram á formi tveggja .csv skráa til að auðvelda frekari gagnavinnslu og greiningu. Þessi tvö lykilgagnasöfn sem voru unnin eru: siggi_hlaup.csv og siggi_hlaup_summary.csv.
+
+Gögnin voru síðan sett í gagnagrunn sem nefnist siggi_timataka.db, sem gerir kleift að vista og vinna með gögnin á hagkvæman hátt í SQL fyrir mælaborðið. Gagnagrunnurinn var notaður til að tryggja að gögnin væru aðgengileg og auðvelt væri að framkvæma frekari greiningu og birtingu í mælaborðinu.
+
+Áskoranir í gagnaöflun fólust einkum í því að skilja réttar upplýsingar frá víðtæku gagnasafni þar sem hlauparar keppa í fjölda keppna með mismunandi niðurröðun og tímum. Það reyndi á að beita skýrum skilmerkjum til að greina gögn sem tengdust Sigurjóni Erni Sturluson frá gögnum annarra þátttakenda. Gögnin voru einnig misjöfn hvað varðar framsetningu og uppbyggingu sem kallaði á frekari hreinsun og vinnslu til að tryggja samræmi þar á milli.
+
+Þar sem gögnin sem tímataka.net býður upp á eru opinber og aðgengileg almenningi án takmarkana, voru engir leyfisskilmálar sem hindruðu notkun gagnanna.
+
+# Gagnavinnsla
+Eftir að gögnin höfðu verið sótt og umbreytt í .csv skrár hófst ítarleg gagnavinnsla til að tryggja að þau væru nothæf og rétt. Fyrst var notast við Python til að hreinsa gögnin og sigta þau enn frekar niður í upplýsingar sem tengdust eingöngu Sigurjóni Erni Sturluson.
+
+Gögnin voru þá undirbúin fyrir gagnagrunn, þar sem þær .csv skrár sem höfðu verið búnar til, voru hreinsaðar og fínstilltar. Reglulegar segðir (REGEX) voru notaðar til að aðlaga textaform, t.d. til að fjarlægja óþarfa tákn eða laga gögn þar sem þau voru ekki samræmd. Þessi aðferð hjálpaði til við að bæta gæði gagnanna og auðvelda flutning þeirra yfir í SQL gagnagrunninn.
+
+Gögnin voru að lokum sett í SQL gagnagrunn með sérstökum töflum fyrir sætisröðun, keppnisniðurstöður og bættan árangur. Þetta gerði kleift að vinna með gögnin á skilvirkan hátt í Shiny mælaborðinu.
+
+
+# Mælaborðið
+Mælaborðið sem var þróað fyrir þetta verkefni veitir innsýn í frammistöðu hlauparans Sigurjóns Ernis Sturlusonar. Það var hannað með það í huga að bjóða upp á fjölbreyttar greiningar á árangri hans í mismunandi keppnum og vegalengdum. Fjögur helstu svæði mælaborðsins eru eftirfarandi:
+
+### Mælaborð 1: Hlutfall hlaupa eftir lengd
+Á þessu mælaborði er sýnt hvernig keppnum Sigurjóns er dreift eftir vegalengd, með köku- og súluritaval. Notendur geta valið hversu margar keppnir þeir vilja sjá í niðurstöðum. Þetta gefur yfirlit yfir þátttöku hans í keppnum með mismunandi vegalengdum, þar sem hlaup eins og 10 km og 42 km eru sýnd áberandi. Þessi framsetning er mikilvæg til að sjá á hvaða vegalengdum Sigurjón hefur keppt mest og hvaða vegalengdir hafa verið ráðandi í keppnisferli hans.
+
+
+### Mælaborð 2: Gögn um hlaup
+Þetta mælaborð sýnir ítarleg gögn um keppnir Sigurjóns, þar sem notendur geta skoðað upplýsingar eins og sæti, BIB-númer, heildartíma og fjölda hringja í hverju hlaupi. Þetta mælaborð veitir mikla dýpt þegar kemur að samanburði milli einstakra hlaupa og sýnir nákvæmar upplýsingar um hans þátttöku í hverri keppni.
+
+
+### Mælaborð 3: Bætur yfir tíma
+Hér fá notendur tækifæri til að skoða bætingar Sigurjóns í mismunandi vegalengdum yfir tíma. Myndin sýnir hvernig Sigurjón hefur þróast í ákveðnum hlaupatengdum þáttum, eins og 10 km, 21 km, 42 km og Puffin keppnum. Notendur geta valið tiltekna tegund hlaupa til að sjá hvernig hann hefur bætt tíma sinn með árunum, með bæði línuriti sem sýnir frammistöðuþróun og samanburðargögn sem sýna tímanlega bætingu hans. Þetta mælaborð gefur dýrmæta yfirsýn yfir það hvernig þjálfun hans og undirbúningur hefur skilað honum í betri árangri í gegnum árin.
+
+
+### Mælaborð 4: Röðun eftir keppnum
+Þetta mælaborð veitir ítarlega innsýn í hvaða sæti Sigurjón hefur náð, í mismunandi hlaupum, þar er hægt að velja að sýna 5-100 hlaup sem sýnir hlaupa_id og sæti hans í því tiltekna hlaupi. Þetta veitir notendum möguleika á að sjá hvernig staða hans hefur breyst og hvernig hann stendur sig í samanburði við aðra keppendur.
+
+### Mælaborðsgreining
+Mælaborðið er hannað til að vera gagnvirkt, notendavænt og veitir notendum möguleika á að greina frammistöðu Sigurjóns á fjölbreyttan hátt. Með aðgengi að mismunandi grafískum framsetningum er auðvelt að skoða þróun í árangri hans yfir tíma, sérstaklega hvað varðar bætingar í keppnum og samanburð á frammistöðu milli hlaupa.
+
+Notendur geta auðveldlega skoðað hvernig Sigurjón hefur bætt frammistöðu sína í gegnum árin, auk þess sem ítarleg gögn um hans þátttöku í keppnum eru aðgengileg í aðskildum gagnagrunnstöflum, sem gerir mælaborðið að mikilvægu verkfæri fyrir áframhaldandi greiningu og endurmat á keppnisáætlunum.
+
+
+# Markverðustu niðurstöður
+Í þessari greiningu lögðum við áherslu á að skoða árangur Sigurjóns Ernis Sturlusonar í mismunandi vegalengdum, til að svara rannsóknarspurningunni:
+
+- Hefur Sigurjón Ernir bætt frammistöðu sína í ákveðnum vegalengdum, t.d. styttri keppnum (10 km) samanborið við lengri vegalengdir (21 km eða meira) yfir tíma?
+
+Til að svara þessari spurningu tókum við til greina fjórar vegalengdir: 10 km, 21 km, 42 km (maraþon) og Puffin-hlaupið. Við skoðuðum breytingar á frammistöðu hans yfir tíma í hverri vegalengd.
+
+#### 10 km hlaup
+Þegar skoðað er 10 km árangur Sigurjóns í keppnum, má sjá sannfærandi framfarir hans yfir tíma. Frá árinu 2024 hefur hann náð verulegri bætingu á tíma sínum. Árið 2024 er hans besti tími 33:41, samanborið við 36:16 árið 2019. Það eru merki um sveiflur á milli keppna, en heildartíminn hefur lækkað verulega miðað við keppnir frá fyrri árum, sem gefur til kynna bættan hlaupahraða og stöðugleika í frammistöðu hans á þessari vegalengd.
+
+![10km](C:/Users/jakob/Pictures/10km.PNG)
+
+#### 21 km hlaup
+Í 21 km keppnum gefur til kynna svipaða þróun, en þar virðast vera meiri sveiflur. Árið 2024 nær Sigurjón bæði sinn besta tíma, 1:14:24, en einnig sinn lakasta tíma, 2:07:15. Árið 2024 er því einkennandi fyrir mikla breytileika í frammistöðu hans á þessari lengri vegalengd, sem gæti líklegast tengst breytilegum keppnisskilyrðum þar sem um fjall eða aðrar slíkar kringumstæður er að ræða sem myndi hægja verulega á tímanum.
+
+![21km](C:/Users/jakob/Pictures/21km.PNG)
+
+#### 42 km hlaup
+Í 42 km keppnum, betur þekkt sem maraþon, sýnir myndin mikla sveiflu í frammistöðu Sigurjóns yfir árin. Árið 2019 náði hann tíma 2:45:40, sem er hans besti tími, en árið 2023 var tíminn verulega verri, 5:28:14. Sveiflur í þessum keppnum gætu tengst bæði keppnisskilyrðum og mögulegum meiðslum eða þreytu. Það sýnir að árangur hans í lengri hlaupum hefur ekki verið eins stöðugur og í styttri vegalengdum, þar sem það er mikil breytileiki milli keppna. Gott að hafa bakvið eyrað að t.d. 5:28:14 tíminn sem í fyrstu reynist rosalega hægt þá má sjá að hann var í fyrsta sæti í því hlaupi sem gefur til kynna að þetta sé ekki gríðarleg vonbrigði í bætingu.
+
+![42km](C:/Users/jakob/Pictures/42km.PNG)
+
+#### Puffin Run
+Síðasta myndin sýnir árangur Sigurjóns í Puffin keppninni, sem er sérstök vegalengd. Hér má einnig sjá að hann hefur náð bætingum frá 2020 til 2024, þar sem tíminn fór úr 1:26:02 niður í 1:21:21. Mikil bæting hefur átt sér stað á milli ára, sérstaklega frá 2022 þegar hann náði 1:56:19, sem sýnir að hann hefur náð aftur góðum stöðugleika eftir fall á milli ára.
+
+![Puffin](C:/Users/jakob/Pictures/puffin.PNG)
+
+
+#### Samantekt á þróun árangurs
+Í heildina hefur Sigurjón sýnt stöðugar framfarir í 10 km keppnum, þar sem heildartíminn hefur lækkað umtalsvert. Það má einnig tengja við þann fjölda hlaupa sem Sigurjón hefur tekið þátt í á þessari vegalengd, þar sem 10 km hlaup eru þau vinsælustu í keppnisferli hans, eins og sjá má á kökuritinu sem sýnir hlutfall hlaupa eftir lengd. Það er því ekki óeðlilegt að bættur árangur á 10 km vegalengd sé í takt við fjölbreytta reynslu hans og þátttöku.
+
+Hins vegar eru meiri sveiflur í frammistöðu hans í lengri keppnum, sérstaklega í 42 km hlaupunum, þar sem hann virðist eiga erfiðara með að viðhalda stöðugum árangri. Þó Sigurjón taki þátt í þessum vegalengdum reglulega, eru þær ekki eins algengar í hans keppnisferli og gætu því spilað inn í breytileikann í frammistöðu hans.
+
+Puffin keppnin sýnir einnig jákvæðar breytingar á frammistöðu hans yfir árin, þar sem hann hefur náð að bæta sig frá 2020, nema í einu hlaupi árið 2022. Puffin-hlaupið er sérhæfð keppni sem kemur aðeins sjaldnar fyrir en 10 km og 42 km hlaup, og því er mögulegt að minni reynsla á þessari vegalengd gæti einnig haft áhrif á sveiflur í frammistöðu.
+
+![Kökurit: Fjöldi hlaupa](C:/Users/jakob/Pictures/fjöldihvershlaups.PNG)
+
+
+# Gæðamat gagna
+Þrátt fyrir að gagnaöflunin og úrvinnslan hafi farið fram með mikilli nákvæmni og kerfisbundinni nálgun, er mikilvægt að benda á að gögnin sem notuð voru í þessu verkefni gætu ekki verið 100% nákvæm. Það eru nokkrar ástæður fyrir því sem tengjast bæði eðli gagnanna sjálfra og umfangi verkefnisins.
+
+### 1. Magn gagna
+Gögnin sem notuð voru voru sótt frá tímataka.net, sem heldur utan um tímamælingar úr þúsundum keppna. Þar sem Sigurjón Ernir Sturluson hefur tekið þátt í fjölmörgum keppnum yfir árin, þurfti að fara í gegnum verulegt magn gagna til að sigta út viðeigandi upplýsingar. Þessi mikla gagnamagnaúrvinnsla gæti hafa skapað svigrúm fyrir villur, þar sem handvirkar og sjálfvirkar ferlar voru notaðir til að bera kennsl á rétt gögn fyrir greininguna.
+
+### 2. Möguleg mistök við gagnahreinsun
+Við hreinsun gagnanna var notast við sjálfvirkar aðferðir, svo sem Python-kóða og reglulegar segðir (REGEX), til að fjarlægja óviðkomandi upplýsingar og staðla gögnin. Þrátt fyrir þessa aðferðarfræði getur verið hætta á að óútskýrðir breytileikar eða gögn með villum hafi ekki verið greind rétt eða hafi misheppnast í hreinsunarferlinu, sérstaklega þar sem keppnisniðurstöður voru unnar úr mismunandi keppnum með breytilegum gagnaskráningum.
+
+
+
+# Ályktanir
+Í heildina gefur verkefnið góða innsýn í frammistöðu og þróun Sigurjóns Ernis Sturlusonar í fjölmörgum hlaupaþátttökum. Gögnin sýna að hann hefur náð umtalsverðum framförum í styttri vegalengdum, eins og 10 km keppnum, þar sem frammistaða hans hefur batnað verulega. Það má tengja þessi góðu úrslit við þá staðreynd að hann hefur tekið þátt í fleiri 10 km hlaupum en nokkurri annarri vegalengd, sem hefur líklega gefið honum aukna reynslu og bættan árangur.
+
+Þegar kemur að lengri keppnum, eins og maraþonhlaupum (42 km), er frammistaða hans breytilegri og sýnir meiri sveiflur yfir árin. Þrátt fyrir færri þátttökur í þessum vegalengdum, eru 42 km hlaup stór þáttur í keppnisferli hans, og mikilvægt væri fyrir hann að halda áfram að þróa færni sína þar til að ná stöðugri frammistöðu.
+
+Mælaborðið sem var þróað veitir ítarlegt og sjónrænt yfirlit yfir þróun frammistöðu Sigurjóns, með möguleika á að skoða bæði heildargögn og sundurgreinda þætti, eins og árangur eftir vegalengdum og keppnum. Með því að nýta fjölda hlaupa, tíma í hverri keppni og sætaröðun, fá notendur dýpri innsýn í frammistöðu hans og geta greint þróun hans í samanburði við keppinauta. Þessi greiningartól veita mikilvægar upplýsingar sem geta verið notaðar til að bæta frammistöðu hans til framtíðar með því að bera saman fyrri niðurstöður og sækja ný markmið.
+
+Gögnin úr mælaborðinu veita einnig tækifæri til að greina hvernig Sigurjón stendur sig í mismunandi keppnum með tilliti til sætaröðunar. Að fylgjast með sæti í keppnum, sérstaklega í lengri hlaupum, getur gefið honum gagnlegar upplýsingar um hvar hann þarf að bæta sig og hvar hann stendur sig vel. Þetta er mikilvægur þáttur í framtíðarskipulagningu og stefnumótun fyrir keppnir, þar sem markviss undirbúningur getur stuðlað að stöðugri framför.
+
+Þrátt fyrir góða úrvinnslu gagna er vert að benda á að sum gögnin gætu haft villur eða skekkjur sem geta haft áhrif á nákvæmni niðurstaðna. Þar sem mælaborðið notar opinber gögn frá tímataka.net, er alltaf möguleiki á að smávægilegar villur hafi slæðst inn í gagnavinnsluna, sérstaklega þegar farið er yfir mikinn fjölda hlaupa. Við mælum því með að frekari greining taki tillit til þessara þátta og að ítarlegri gögn um keppnir og sæti séu tekin með í framtíðarúttektir. Með frekari gögn og ítarlegri greiningu gæti verið hægt að bæta niðurstöður og þróa áframhaldandi greiningu á frammistöðu Sigurjóns í víðari samhengi.
+
+
+
