@@ -1,8 +1,12 @@
 ---
 title: "Tímataka - Sigurjón Ernir Sturlusson"
-author: "Brynjar Ari Magnússon, Gunnar Sigurjón Árnason, Halldór Óli Gunnarsson, Jakob Stefán Ívarsson"
+author: Brynjar Ari Magnússon, Gunnar Sigurjón Árnason, Halldór Óli Gunnarsson, Jakob
+  Stefán Ívarsson
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
   html_document:
     toc: true
     toc_depth: 3
@@ -29,8 +33,8 @@ Skýrslan mun fjalla um ferlið við gagnaöflun og gagnavinnslu, leggja fram he
 
 Markmið skýrslunnar er því að sýna fram á hvernig notkun gagna og greiningar geta veitt dýpri innsýn í árangur einstaklings með því að vinna úr þeim ýmiskonar mæliborð.
 
-
-# Lýsing á gagnaöflun    
+# Aðferðafræði
+## Lýsing á gagnaöflun    
 Gögnin fyrir þetta verkefni voru sótt af opinberu gagnasafni á vefsíðunni tímataka.net, sem heldur utan um upplýsingar um keppnir og niðurstöður hlaupara í ýmsum vegalengdum. Í þessu verkefni var sérstök áhersla lögð á að safna gögnum um tiltekinn hlaupara, Sigurjón Erni Sturluson, þar sem niðurstöður hans úr öllum hlaupaþátttökum sem skráðar voru á síðuna, voru notaðar til frekari greiningar.
 
 Við gagnaöflunina var notast við Python-kóða til að sækja gögnin á kerfisbundinn hátt. Python-kóðinn greindi allar keppnir sem hlauparinn hafði tekið þátt í og dró sérstaklega fram upplýsingar um sæti hans og tíma í keppnunum. Gögnin voru sett fram á formi tveggja .csv skráa til að auðvelda frekari gagnavinnslu og greiningu. Þessi tvö lykilgagnasöfn sem voru unnin eru: siggi_hlaup.csv og siggi_hlaup_summary.csv.
@@ -41,15 +45,151 @@ Gögnin voru síðan sett í gagnagrunn sem nefnist siggi_timataka.db, sem gerir
 
 Þar sem gögnin sem tímataka.net býður upp á eru opinber og aðgengileg almenningi án takmarkana, voru engir leyfisskilmálar sem hindruðu notkun gagnanna.
 
-# Gagnavinnsla
+## Gagnavinnsla
 Eftir að gögnin höfðu verið sótt og umbreytt í .csv skrár hófst ítarleg gagnavinnsla til að tryggja að þau væru nothæf og rétt. Fyrst var notast við Python til að hreinsa gögnin og sigta þau enn frekar niður í upplýsingar sem tengdust eingöngu Sigurjóni Erni Sturluson.
 
 Gögnin voru þá undirbúin fyrir gagnagrunn, þar sem þær .csv skrár sem höfðu verið búnar til, voru hreinsaðar og fínstilltar. Reglulegar segðir (REGEX) voru notaðar til að aðlaga textaform, t.d. til að fjarlægja óþarfa tákn eða laga gögn þar sem þau voru ekki samræmd. Þessi aðferð hjálpaði til við að bæta gæði gagnanna og auðvelda flutning þeirra yfir í SQL gagnagrunninn.
 
 Gögnin voru að lokum sett í SQL gagnagrunn með sérstökum töflum fyrir sætisröðun, keppnisniðurstöður og bættan árangur. Þetta gerði kleift að vinna með gögnin á skilvirkan hátt í Shiny mælaborðinu.
 
+## Kóðarýni
+Stutt kóðarýni á activeapp.py kóðanum sem notaður er til að keyra Shiny mælaborðið.
 
-# Mælaborðið
+```{r}
+# Fall til að hlaða gögn úr SQLite gagnagrunni
+def load_data_from_db():
+    # Tengist SQLite gagnagrunninum
+    conn = sqlite3.connect('siggi_timataka.db')
+
+    # Hleður gögnin inn í DataFrames með SQL fyrirspurnum
+    summary_data = pd.read_sql_query("SELECT * FROM siggi_hlaup_summary", conn)
+    hlaup_data = pd.read_sql_query("SELECT * FROM timataka", conn)
+    ar_data = pd.read_sql_query("SELECT * FROM ar_id_table", conn)
+
+    # Lokar tengingu við gagnagrunn
+    conn.close()
+    
+    return summary_data, hlaup_data, ar_data
+
+```
+
+Þetta fall tengist SQLite gagnagrunninum og sækir gögn úr þremur töflum:
+
+- siggi_hlaup_summary: Samantekt á keppnum.
+- timataka: Nánari gögn um hverja keppni.
+- ar_id_table: Inniheldur upplýsingar um keppnisár fyrir hvert hlaupanúmer (hlaup_id).
+Gögnin eru geymd í Pandas DataFrames og skilað til notkunar síðar í forritinu.
+
+
+
+```{r}
+# Fall til að sía gögn út frá 'IDs' og 'hlaup_id'
+def get_filtered_data_for_ids(hlaup_data, ids_str):
+    ids_list = ids_str.split(", ")
+    ids_list = [int(id_) for id_ in ids_list]
+    filtered_data = hlaup_data[hlaup_data['hlaup_id'].isin(ids_list)]
+    filtered_data = filtered_data.sort_values('hlaup_id')
+    return filtered_data
+```
+Fallið tekur inn streng með hlaupanúmerum (ids_str), skiptir honum niður í lista og síar hlaup_data til að einungis innihalda raðir þar sem hlaup_id samsvarar þeim hlaupanúmerum sem notandinn velur.
+Síðan er gagnasafnið flokkað í hækkandi röð eftir hlaup_id.
+
+
+```{r}
+# UI - Notendaviðmót
+app_ui = ui.page_fluid(
+    ui.navset_tab(
+        ui.nav_panel(
+            "Heim",
+            ui.layout_sidebar(
+                ui.sidebar(
+                    ui.h3("Valmöguleikar"),
+                    ui.input_slider("num_races", "Fjöldi hlaupa í Rank línuriti:", min=5, max=100, value=10),
+                    ui.input_radio_buttons("chart_type", "Veldu grafgerð:", choices=['Pie Chart', 'Bar Chart'], selected='Pie Chart'),
+                ),
+                ui.div(
+                    output_widget("home_chart"),
+                    output_widget("rank_plot"),
+                )
+            )
+        ),
+        ...
+    )
+)
+```
+
+Notendaviðmótið er skipulagt í nokkra flipa:
+Heim: Þar sem notendur geta valið fjölda hlaupa sem sýnd eru og tegund myndrits.
+Bætingar: Inniheldur bætingartölur yfir tíma.
+Gögn: Sýnir töflur með hlaupagögnum, samantektum og keppnisárum.
+Um: Almennar upplýsingar um forritið.
+Slæðan og takkar gefa notendum tækifæri til að stjórna og velja gögn til skoðunar.
+
+
+```{r}
+@output
+@render_plotly
+def home_chart():
+    chart_type = input.chart_type()
+    if chart_type == 'Pie Chart':
+        fig = px.pie(summary_data, values='Count', names='Length', title="Hlutfall hlaupa eftir lengd")
+    else:
+        fig = px.bar(summary_data, x='Length', y='Count', title="Fjöldi hlaupa eftir lengd")
+    return fig
+```
+home_chart teiknar út annað hvort kökurit eða súlurit, fer eftir vali notandans. Það notast við summary_data til að sýna annað hvort hlutfallslegt hlutfall eða fjölda hlaupa eftir vegalengd.
+
+```{r}
+@output
+@render_plotly
+def improvement_line_chart():
+    data = filtered_data()
+    if data.empty:
+        return px.line(title="Engin gögn til að sýna.")
+
+    if 'Time' in data.columns and not data['Time'].isnull().all():
+        data['Time_in_seconds'] = pd.to_timedelta(data['Time']).dt.total_seconds()
+        data = data.dropna(subset=['hlaup_id', 'Time_in_seconds'])
+        data = data.sort_values('hlaup_id')
+
+        fig = px.line(
+            data,
+            x='hlaup_id',
+            y='Time_in_seconds',
+            title=f"Framvinda: Tími fyrir {input.length_select()}",
+            labels={'hlaup_id': 'Hlaup ID', 'Time_in_seconds': 'Tími (sekúndur)'}
+        )
+        fig.update_traces(mode='lines+markers')
+        return fig
+```
+Þetta línurit teiknar bætingar hlauparans yfir tíma með því að umbreyta tíma í sekúndur og sýnir hvernig tíminn breytist eftir hverju hlaupi (hlaup_id).
+Notað er Plotly til að búa til línuritið sem sýnir framvindu tíma.
+
+```{r}
+@output
+@render.table
+def selected_data_table():
+    selected_table = input.table_select()
+    if selected_table == 'hlaup_data':
+        return hlaup_data.sort_values('hlaup_id', ascending=True)
+    elif selected_table == 'summary_data':
+        return summary_data
+    elif selected_table == 'ar_data':
+        return ar_data
+    else:
+        return pd.DataFrame()
+```
+Notendur geta valið milli þess að skoða hlaup_data, summary_data, eða ar_data, sem eru sýndar í töfluformi. Gögnin eru flokkuð eftir hlaup_id til að auðvelda yfirsýn.
+
+```{r}
+# Keyra Shiny appið
+app = App(app_ui, server)
+```
+Þessi skipun keyrir Shiny forritið með því að sameina UI og server virkni og með því færðu vefsíðu til að setja í vafra.
+
+
+#Niðurstöður 
+## Mælaborðið
 Mælaborðið sem var þróað fyrir þetta verkefni veitir innsýn í frammistöðu hlauparans Sigurjóns Ernis Sturlusonar. Það var hannað með það í huga að bjóða upp á fjölbreyttar greiningar á árangri hans í mismunandi keppnum og vegalengdum. Fjögur helstu svæði mælaborðsins eru eftirfarandi:
 
 ### Mælaborð 1: Hlutfall hlaupa eftir lengd
@@ -73,7 +213,7 @@ Mælaborðið er hannað til að vera gagnvirkt, notendavænt og veitir notendum
 Notendur geta auðveldlega skoðað hvernig Sigurjón hefur bætt frammistöðu sína í gegnum árin, auk þess sem ítarleg gögn um hans þátttöku í keppnum eru aðgengileg í aðskildum gagnagrunnstöflum, sem gerir mælaborðið að mikilvægu verkfæri fyrir áframhaldandi greiningu og endurmat á keppnisáætlunum.
 
 
-# Markverðustu niðurstöður
+## Markverðustu niðurstöður
 Í þessari greiningu lögðum við áherslu á að skoða árangur Sigurjóns Ernis Sturlusonar í mismunandi vegalengdum, til að svara rannsóknarspurningunni:
 
 - Hefur Sigurjón Ernir bætt frammistöðu sína í ákveðnum vegalengdum, t.d. styttri keppnum (10 km) samanborið við lengri vegalengdir (21 km eða meira) yfir tíma?

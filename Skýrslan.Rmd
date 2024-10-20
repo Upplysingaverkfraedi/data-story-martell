@@ -1,6 +1,7 @@
 ---
 title: "Tímataka - Sigurjón Ernir Sturlusson"
-author: "Brynjar Ari Magnússon, Gunnar Sigurjón Árnason, Halldór Óli Gunnarsson, Jakob Stefán Ívarsson"
+author: Brynjar Ari Magnússon, Gunnar Sigurjón Árnason, Halldór Óli Gunnarsson, Jakob
+  Stefán Ívarsson
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
   html_document:
@@ -11,6 +12,9 @@ output:
     code_folding: hide
     number_sections: true
     df_print: paged
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -178,6 +182,38 @@ def selected_data_table():
 Notendur geta valið milli þess að skoða hlaup_data, summary_data, eða ar_data, sem eru sýndar í töfluformi. Gögnin eru flokkuð eftir hlaup_id til að auðvelda yfirsýn.
 
 ```{r eval=FALSE}
+# Línurit sem sýnir hraða eftir hlaup ID
+@output
+@render_plotly
+def speed_line_chart():
+    data = speed_filtered_data()
+    if data.empty:
+        return px.scatter(title="Engin gögn til að sýna.")
+    
+    data['Distance_km'] = data['Distance_m'] / 1000
+    data['Time_formatted'] = data['Time_in_seconds'].apply(format_seconds_to_hhmmss)
+
+    fig = px.line(
+        data,
+        x='hlaup_id',
+        y='Speed_m_s',
+        title="Hraði (m/s) eftir hlaup ID",
+        labels={'hlaup_id': 'Hlaup ID', 'Speed_m_s': 'Hraði (m/s)'},
+        hover_data={'Name': True, 'Distance_km': True, 'Time_formatted': True},
+        markers=True
+    )
+    fig.update_traces(
+        hovertemplate='Hlaup ID: %{x}<br>Nafn: %{customdata[0]}<br>Vegalengd: %{customdata[1]:.2f} km<br>Tími: %{customdata[2]}<br>Hraði: %{y:.2f} m/s'
+    )
+
+    return fig
+
+
+```
+
+Þetta línurit sýnir hraða (m/s) á y-ásnum og hlaup ID á x-ásnum fyrir valda vegalengd. Gögnin eru merkt með vegalengd keppnanna og formattaður tími (HH:MM).
+
+```{r eval=FALSE}
 # Keyra Shiny appið
 app = App(app_ui, server)
 ```
@@ -186,7 +222,7 @@ app = App(app_ui, server)
 
 # Niðurstöður   
 ## Mælaborðið
-Mælaborðið sem var þróað fyrir þetta verkefni veitir innsýn í frammistöðu hlauparans Sigurjóns Ernis Sturlusonar. Það var hannað með það í huga að bjóða upp á fjölbreyttar greiningar á árangri hans í mismunandi keppnum og vegalengdum. Fjögur helstu svæði mælaborðsins eru eftirfarandi:
+Mælaborðið sem var þróað fyrir þetta verkefni veitir innsýn í frammistöðu hlauparans Sigurjóns Ernis Sturlusonar. Það var hannað með það í huga að bjóða upp á fjölbreyttar greiningar á árangri hans í mismunandi keppnum og vegalengdum. Fimm helstu svæði mælaborðsins eru eftirfarandi:
 
 ### Mælaborð 1: Hlutfall hlaupa eftir lengd
 Á þessu mælaborði er sýnt hvernig keppnum Sigurjóns er dreift eftir vegalengd, með köku- og súluritaval. Notendur geta valið hversu margar keppnir þeir vilja sjá í niðurstöðum. Þetta gefur yfirlit yfir þátttöku hans í keppnum með mismunandi vegalengdum, þar sem hlaup eins og 10 km og 42 km eru sýnd áberandi. Þessi framsetning er mikilvæg til að sjá á hvaða vegalengdum Sigurjón hefur keppt mest og hvaða vegalengdir hafa verið ráðandi í keppnisferli hans.
@@ -203,6 +239,17 @@ Hér fá notendur tækifæri til að skoða bætingar Sigurjóns í mismunandi v
 ### Mælaborð 4: Röðun eftir keppnum
 Þetta mælaborð veitir ítarlega innsýn í hvaða sæti Sigurjón hefur náð, í mismunandi hlaupum, þar er hægt að velja að sýna 5-100 hlaup sem sýnir hlaupa_id og sæti hans í því tiltekna hlaupi. Þetta veitir notendum möguleika á að sjá hvernig staða hans hefur breyst og hvernig hann stendur sig í samanburði við aðra keppendur.
 
+### Mælaborð 5: Hraði Sigurjóns í hlaupum
+Þetta mælaborð veitir notendum möguleika á að bera saman frammistöðu Sigurjóns eftir mismunandi vegalengdum, sem er sérstaklega gagnlegt til að sjá hvernig hraði hans hefur þróast á ákveðnum vegalengdum yfir tíma. 
+Notandinn getur valið úr fjórum vegalengdarflokkum:  
+
+- 1-10 km
+- 10-20 km
+- 20-40 km
+- 40+ km
+
+Mælaborðið birtir síðan línurit sem sýnir hraða Sigurjóns á y-ás og hlaup_id á x-ás. Þetta gefur notendum tækifæri til að skoða hvernig hann hefur staðið sig á mismunandi vegalengdum og hvernig hraðinn hefur breyst í keppnum innan hvers flokks. Þetta getur verið mikilvægur mælikvarði til að sjá hvort Sigurjón er fljótari á styttri vegalengdum eða hvort hann heldur uppi hraða á lengri vegalengdum.
+
 ### Mælaborðsgreining
 Mælaborðið er hannað til að vera gagnvirkt, notendavænt og veitir notendum möguleika á að greina frammistöðu Sigurjóns á fjölbreyttan hátt. Með aðgengi að mismunandi grafískum framsetningum er auðvelt að skoða þróun í árangri hans yfir tíma, sérstaklega hvað varðar bætingar í keppnum og samanburð á frammistöðu milli hlaupa.
 
@@ -214,7 +261,9 @@ Notendur geta auðveldlega skoðað hvernig Sigurjón hefur bætt frammistöðu 
 
 - Hefur Sigurjón Ernir bætt frammistöðu sína í ákveðnum vegalengdum, t.d. styttri keppnum (10 km) samanborið við lengri vegalengdir (21 km eða meira) yfir tíma?
 
-Til að svara þessari spurningu tókum við til greina fjórar vegalengdir: 10 km, 21 km, 42 km (maraþon) og Puffin-hlaupið. Við skoðuðum breytingar á frammistöðu hans yfir tíma í hverri vegalengd.
+- Er hann að ná miklu hraðabætingum?
+
+Til að svara þessari fyrri spurningu tókum við til greina fjórar vegalengdir: 10 km, 21 km, 42 km (maraþon) og Puffin-hlaupið. Við skoðuðum breytingar á frammistöðu hans yfir tíma í hverri vegalengd.
 
 #### 10 km hlaup
 Þegar skoðað er 10 km árangur Sigurjóns í keppnum, má sjá sannfærandi framfarir hans yfir tíma. Frá árinu 2024 hefur hann náð verulegri bætingu á tíma sínum. Árið 2024 er hans besti tími 33:41, samanborið við 36:16 árið 2019. Það eru merki um sveiflur á milli keppna, en heildartíminn hefur lækkað verulega miðað við keppnir frá fyrri árum, sem gefur til kynna bættan hlaupahraða og stöðugleika í frammistöðu hans á þessari vegalengd.
@@ -245,6 +294,13 @@ Hins vegar eru meiri sveiflur í frammistöðu hans í lengri keppnum, sérstakl
 Puffin keppnin sýnir einnig jákvæðar breytingar á frammistöðu hans yfir árin, þar sem hann hefur náð að bæta sig frá 2020, nema í einu hlaupi árið 2022. Puffin-hlaupið er sérhæfð keppni sem kemur aðeins sjaldnar fyrir en 10 km og 42 km hlaup, og því er mögulegt að minni reynsla á þessari vegalengd gæti einnig haft áhrif á sveiflur í frammistöðu.
 
 ![Kökurit: Fjöldi hlaupa](C:/Users/jakob/Pictures/fjöldihvershlaups.PNG)
+
+
+Til að svara seinni spurningunni sést að myndin sýnir hraða Sigurjóns á x-ásnum (hlaup ID) og hraða á y-ásnum (m/s). Vinstra megin eru fyrstu hlaupin hans, en hægra megin sjáum við nýjustu hlaupin. Þegar við skoðum myndina er augljóst að hraði hans er almennt lækkandi yfir tíma, eins og hallalínan sýnir. Þrátt fyrir einstaka hápunkta þar sem hraði virðist batna á milli hlaupa, bendir hallalínan til þess að hann hefur verið hægari í nýjustu keppnunum miðað við þær fyrri.
+
+![Hraðabreyting](C:/Users/jakob/Pictures/hraði.PNG)
+
+Það er sérstaklega áhugavert að sjá hvernig nýrri keppnir hafa breytilegan hraða, og það bendir til að ytri þættir eins og vegalengd, undirbúningur eða jafnvel meiðsli gætu spilað inn í þessa þróun. Hins vegar þyrfti að skoða fleiri breytur, eins og hvort hann hafi verið að keppa í erfiðari keppnum (lengri vegalengdir eða breytt landslag), til að fá skýrari mynd af því hvort og hvernig hann er að bæta sig í heildina.
 
 
 # Gæðamat gagna
